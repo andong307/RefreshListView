@@ -29,6 +29,8 @@ public class MainActivity extends Activity {
 		setContentView(R.layout.activity_main);
 		
 		final RefreshListView mRefreshListView = (RefreshListView) findViewById(R.id.refreshlistview);
+		mRefreshListView.setPullToRefreshEnable(true);
+		mRefreshListView.setLoadingMoreEnable(true);
 		
 		listData = new ArrayList<String>();
 		for (int i = 0; i < 30; i++) {
