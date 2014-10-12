@@ -5,11 +5,9 @@ import java.util.Date;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.RotateAnimation;
 import android.widget.AbsListView;
@@ -31,7 +29,7 @@ public class RefreshListView extends ListView implements OnScrollListener {
 	private final String TAG = "RefreshListView";
 	private int firstVisibleItem;	// 滚动时显示在顶部的position
 	private int downY = -1; // 按下y轴的偏移量
-	private int refreshViewHeight;	// 头布局的高度
+	private int refreshViewHeight;	// 下拉刷新布局的高度
 	private LinearLayout headerView;	// 头布局
 	private View mRefreshView;	// 头布局
 	private DisplayMode currentState = DisplayMode.PULL_DOWN_REFRESH;	// 头布局当前的状态, 默认为下拉状态
@@ -43,9 +41,11 @@ public class RefreshListView extends ListView implements OnScrollListener {
 	private TextView tvLastUpdateTime;	// 最后刷新时间
 	private OnRefreshListener mOnRefreshListener;	// 下拉刷新监听事件
 	private boolean isScroll2Bottom = false;	// 是否滚动到底部
-	private View footerView;
-	private int footerViewHeight;
+	private View footerView; // 加载更多布局
+	private int footerViewHeight; // 加载更多布局高度
 	private boolean isLoadMoring = false;	// 是否正在加载更多中
+	private boolean isEnablePullToRefresh = false;	// 是否启用下拉刷新功能
+	private boolean isEnableLoadingMore = false;	// 是否启用加载更多功能
 
 	public RefreshListView(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -74,7 +74,7 @@ public class RefreshListView extends ListView implements OnScrollListener {
 		ivArrow.setMinimumWidth(50);
 		tvLastUpdateTime.setText("最后刷新时间: " + getLastUpdateTime());
 		
-		measureView(mRefreshView);
+		mRefreshView.measure(0, 0);
 		refreshViewHeight = mRefreshView.getMeasuredHeight();
 		
 		mRefreshView.setPadding(0, -refreshViewHeight, 0, 0);
@@ -107,13 +107,11 @@ public class RefreshListView extends ListView implements OnScrollListener {
 	 */
 	private void initFooterView() {
 		footerView = LayoutInflater.from(getContext()).inflate(R.layout.listview_footer, null);
-		measureView(footerView);
-		
+		footerView.measure(0, 0);
 		footerViewHeight = footerView.getMeasuredHeight();
 		
 		// 隐藏脚布局
 		footerView.setPadding(0, -footerViewHeight, 0, 0);
-		
 		addFooterView(footerView);
 	}
 
@@ -126,30 +124,6 @@ public class RefreshListView extends ListView implements OnScrollListener {
 		return sdf.format(new Date());
 	}
 	
-	/**
-	 * 测量出child的宽高
-	 * @param child
-	 */
-	private void measureView(View child) {
-        ViewGroup.LayoutParams p = child.getLayoutParams();
-        if (p == null) {
-            p = new ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
-        }
-
-        int childWidthSpec = ViewGroup.getChildMeasureSpec(0, 0, p.width);
-        int lpHeight = p.height;
-        int childHeightSpec;
-        if (lpHeight > 0) {
-        	Log.i("RefreshListView", "lpHeight 大于 0");
-            childHeightSpec = MeasureSpec.makeMeasureSpec(lpHeight, MeasureSpec.EXACTLY);
-        } else {
-            childHeightSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
-        }
-        child.measure(childWidthSpec, childHeightSpec);
-    }
-
 	@Override
 	public void onScrollStateChanged(AbsListView view, int scrollState) {
 		
@@ -158,11 +132,10 @@ public class RefreshListView extends ListView implements OnScrollListener {
 		 * SCROLL_STATE_TOUCH_SCROLL 按住屏幕使ListView滚动时返回
 		 * SCROLL_STATE_FLING 快速的拖动屏幕滚动返回
 		 */
-		if((scrollState == OnScrollListener.SCROLL_STATE_IDLE 
-				|| scrollState == OnScrollListener.SCROLL_STATE_FLING)
+		if(isEnableLoadingMore
+				&&(scrollState == OnScrollListener.SCROLL_STATE_IDLE || scrollState == OnScrollListener.SCROLL_STATE_FLING)
 				&& isScroll2Bottom
 				&& !isLoadMoring) {
-			Log.i(TAG, "加载更多");
 			footerView.setPadding(0, 0, 0, 0);
 			setSelection(getCount());	// 滚动到ListView的最后一条
 			isLoadMoring = true;
@@ -183,6 +156,7 @@ public class RefreshListView extends ListView implements OnScrollListener {
 	public void onScroll(AbsListView view, int firstVisibleItem,
 			int visibleItemCount, int totalItemCount) {
 		this.firstVisibleItem = firstVisibleItem;
+		
 		if((firstVisibleItem + visibleItemCount) == totalItemCount
 				&& totalItemCount > visibleItemCount) {
 			isScroll2Bottom = true;
@@ -210,7 +184,8 @@ public class RefreshListView extends ListView implements OnScrollListener {
 				break;
 			}
 			
-			if(firstVisibleItem == 0
+			if(isEnablePullToRefresh
+					&& firstVisibleItem == 0
 					&& paddingTop > -refreshViewHeight) {
 				
 				if(currentState == DisplayMode.PULL_DOWN_REFRESH
@@ -298,5 +273,21 @@ public class RefreshListView extends ListView implements OnScrollListener {
 	 */
 	public void setOnRefreshListener(OnRefreshListener listener) {
 		this.mOnRefreshListener = listener;
+	}
+	
+	/**
+	 * 设置下拉刷新的开关
+	 * @param isEnablePullToRefresh true:启用
+	 */
+	public void setPullToRefreshEnable(boolean isEnablePullToRefresh) {
+		this.isEnablePullToRefresh = isEnablePullToRefresh;
+	}
+	
+	/**
+	 * 设置加载更多的开关
+	 * @param isEnableLoadingMore true:启用
+	 */
+	public void setLoadingMoreEnable(boolean isEnableLoadingMore) {
+		this.isEnableLoadingMore = isEnableLoadingMore;
 	}
 }
