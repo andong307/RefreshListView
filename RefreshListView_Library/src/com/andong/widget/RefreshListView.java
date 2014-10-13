@@ -46,6 +46,8 @@ public class RefreshListView extends ListView implements OnScrollListener {
 	private boolean isLoadMoring = false;	// 是否正在加载更多中
 	private boolean isEnablePullToRefresh = false;	// 是否启用下拉刷新功能
 	private boolean isEnableLoadingMore = false;	// 是否启用加载更多功能
+	private View topView;
+	private int mLocationInWindowY = -1;
 
 	public RefreshListView(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -56,6 +58,7 @@ public class RefreshListView extends ListView implements OnScrollListener {
 	}
 
 	public void addCustomHeaderView(View v) {
+		this.topView = v;
 		headerView.addView(v);
 	}
 	
@@ -176,8 +179,21 @@ public class RefreshListView extends ListView implements OnScrollListener {
 				downY = (int) ev.getY();
 			}
 			
+			if(topView != null) {
+				int[] location = new int[2];
+				if(mLocationInWindowY == -1) {
+					getLocationInWindow(location);
+					mLocationInWindowY = location[1];
+				}
+				
+				topView.getLocationInWindow(location);
+				if(location[1] < mLocationInWindowY) {
+					break;
+				}
+			}
+
 			int moveY = (int) ev.getY();	// 移动中的y轴偏移量
-			
+
 			int paddingTop = -refreshViewHeight + (moveY - downY) / 2;
 			
 			if(currentState == DisplayMode.REFRESHING) {	// 如果正在刷新中, 不做下拉的动作
